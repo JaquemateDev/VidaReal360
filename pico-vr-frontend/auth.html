@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Login / Registro</title>
+  <style>
+    body { font-family: Arial; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
+    #container { width:300px; }
+    form { display:none; }
+    form.active { display:block; }
+    input, button { width:100%; padding:8px; margin:5px 0; }
+    #toggle { text-align:center; cursor:pointer; color:#4285f4; }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <h2 id="title">Iniciar sesión</h2>
+    <form id="loginForm" class="active">
+      <input type="email" id="loginEmail" placeholder="Email" required>
+      <input type="password" id="loginPass" placeholder="Contraseña" required>
+      <button>Entrar</button>
+    </form>
+    <form id="registerForm">
+      <input type="email" id="regEmail" placeholder="Email" required>
+      <input type="password" id="regPass" placeholder="Contraseña (mín.6)" required>
+      <button>Registrarse</button>
+    </form>
+    <div id="toggle">¿No tienes cuenta? Regístrate</div>
+    <div id="msg" style="color:red; font-size:0.9em;"></div>
+  </div>
+
+  <script>
+    const SERVER = 'https://192.168.0.35:4000';
+    const loginForm    = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const titleEl      = document.getElementById('title');
+    const toggle       = document.getElementById('toggle');
+    const msg          = document.getElementById('msg');
+
+    let mode = 'login'; // o 'register'
+
+    toggle.addEventListener('click', () => {
+      if (mode === 'login') {
+        mode = 'register';
+        loginForm.classList.remove('active');
+        registerForm.classList.add('active');
+        titleEl.textContent = 'Registro';
+        toggle.textContent = '¿Ya tienes cuenta? Inicia sesión';
+      } else {
+        mode = 'login';
+        registerForm.classList.remove('active');
+        loginForm.classList.add('active');
+        titleEl.textContent = 'Iniciar sesión';
+        toggle.textContent = '¿No tienes cuenta? Regístrate';
+      }
+      msg.textContent = '';
+    });
+
+    loginForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      msg.textContent = '';
+      try {
+        const res = await fetch(`${SERVER}/auth/login`, {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({
+            email: document.getElementById('loginEmail').value,
+            password: document.getElementById('loginPass').value
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.msg || JSON.stringify(data));
+        localStorage.setItem('token', data.token);
+        window.location = '/'; // redirige a galería
+      } catch (e) {
+        msg.textContent = e.message;
+      }
+    });
+
+    registerForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      msg.textContent = '';
+      try {
+        const res = await fetch(`${SERVER}/auth/register`, {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({
+            email: document.getElementById('regEmail').value,
+            password: document.getElementById('regPass').value
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.msg || JSON.stringify(data.errors));
+        msg.style.color = 'green';
+        msg.textContent = data.msg;
+        // tras registro, cambia a login automáticamente
+        setTimeout(() => toggle.click(), 1500);
+      } catch (e) {
+        msg.style.color = 'red';
+        msg.textContent = e.message;
+      }
+    });
+  </script>
+</body>
+</html>
