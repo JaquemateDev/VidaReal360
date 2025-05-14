@@ -1,17 +1,46 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8">
   <title>Login / Registro</title>
   <style>
-    body { font-family: Arial; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
-    #container { width:300px; }
-    form { display:none; }
-    form.active { display:block; }
-    input, button { width:100%; padding:8px; margin:5px 0; }
-    #toggle { text-align:center; cursor:pointer; color:#4285f4; }
+    body {
+      font-family: Arial;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    #container {
+      width: 300px;
+    }
+
+    form {
+      display: none;
+    }
+
+    form.active {
+      display: block;
+    }
+
+    input,
+    button {
+      width: 100%;
+      padding: 8px;
+      margin: 5px 0;
+    }
+
+    #toggle {
+      text-align: center;
+      cursor: pointer;
+      color: #4285f4;
+    }
   </style>
 </head>
+
 <body>
   <div id="container">
     <h2 id="title">Iniciar sesión</h2>
@@ -21,9 +50,12 @@
       <button>Entrar</button>
     </form>
     <form id="registerForm">
+      <input type="text" id="regNombre" placeholder="Nombre" required>
+      <input type="text" id="regApellidos" placeholder="Apellidos" required>
       <input type="email" id="regEmail" placeholder="Email" required>
-      <input type="password" id="regPass" placeholder="Contraseña (mín.6)" required>
+      <input type="password" id="regPass" placeholder="Contraseña" required minlength="6">
       <button>Registrarse</button>
+      
     </form>
     <div id="toggle">¿No tienes cuenta? Regístrate</div>
     <div id="msg" style="color:red; font-size:0.9em;"></div>
@@ -31,11 +63,11 @@
 
   <script>
     const SERVER = 'https://192.168.0.35:4000';
-    const loginForm    = document.getElementById('loginForm');
+    const loginForm = document.getElementById('loginForm');
     const registerForm = document.getElementById('registerForm');
-    const titleEl      = document.getElementById('title');
-    const toggle       = document.getElementById('toggle');
-    const msg          = document.getElementById('msg');
+    const titleEl = document.getElementById('title');
+    const toggle = document.getElementById('toggle');
+    const msg = document.getElementById('msg');
 
     let mode = 'login'; // o 'register'
 
@@ -62,7 +94,7 @@
       try {
         const res = await fetch(`${SERVER}/auth/login`, {
           method: 'POST',
-          headers: {'Content-Type':'application/json'},
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             email: document.getElementById('loginEmail').value,
             password: document.getElementById('loginPass').value
@@ -83,8 +115,10 @@
       try {
         const res = await fetch(`${SERVER}/auth/register`, {
           method: 'POST',
-          headers: {'Content-Type':'application/json'},
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            nombre: document.getElementById('regNombre').value,
+            apellidos: document.getElementById('regApellidos').value,
             email: document.getElementById('regEmail').value,
             password: document.getElementById('regPass').value
           })
@@ -102,4 +136,5 @@
     });
   </script>
 </body>
+
 </html>

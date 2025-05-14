@@ -131,7 +131,7 @@ async (req, res) => {
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
-  const { email, password } = req.body;
+  const { nombre, apellidos, email, password } = req.body;
   try {
     // 2) Comprueba si ya existe
     const [existing] = await pool.query(
@@ -143,8 +143,8 @@ async (req, res) => {
     // 3) Hashea y guarda
     const hash = await bcrypt.hash(password, 10);
     await pool.query(
-      'INSERT INTO usuario (email, contrasena) VALUES (?,?)',
-      [email, hash]
+      'INSERT INTO usuario (nombre, apellidos, email, contrasena) VALUES (?,?,?,?)',
+      [nombre, apellidos, email, hash]
     );
     res.json({ msg: 'Usuario creado correctamente' });
   } catch (err) {
@@ -164,7 +164,7 @@ async (req, res) => {
   }
   const { email, password } = req.body;
   try {
-    // 1) Recupera usuario
+    // 1) Recupera usuario (columna contrasena)
     const [rows] = await pool.query(
       'SELECT id, contrasena FROM usuario WHERE email = ?', [email]
     );
@@ -172,11 +172,13 @@ async (req, res) => {
       return res.status(400).json({ msg: 'Credenciales inválidas' });
     }
     const user = rows[0];
-    // 2) Compara hash
-    const match = await bcrypt.compare(password, user.password);
+
+    // 2) Compara hash usando user.contrasena
+    const match = await bcrypt.compare(password, user.contrasena);
     if (!match) {
       return res.status(400).json({ msg: 'Credenciales inválidas' });
     }
+
     // 3) Genera JWT
     const token = jwt.sign(
       { id: user.id, email },
@@ -189,6 +191,7 @@ async (req, res) => {
     res.status(500).json({ error: 'Error de servidor' });
   }
 });
+
 
 // Arranca HTTPS
 https

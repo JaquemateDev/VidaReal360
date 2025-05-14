@@ -1,6 +1,18 @@
 document.addEventListener('DOMContentLoaded', () => {
+
+  // 1) Comprueba token ANTES de DOMContentLoaded
+  const token = localStorage.getItem('token');
+  if (!token) {
+    // Redirige inmediatamente a auth.html
+    window.location.replace('/auth.html');
+    // Evita que ejecute más código
+    throw new Error('No autenticado: redirigiendo a login');
+  }
+
+
   console.log("Inicializando aplicación...");
   const SERVER = 'https://192.168.0.35:4000';
+  
   const videoGrid = document.getElementById('video-grid');
   const searchInput = document.getElementById('search-input');
   const loading = document.getElementById('loading');
@@ -9,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const mainContainer = document.querySelector('.container');
   const vrScene = document.querySelector('a-scene');
   const backButton = document.getElementById('back-button');
-  
+
   console.log("Elementos DOM encontrados:", {
     videoGrid: !!videoGrid,
     searchInput: !!searchInput,
@@ -20,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     vrScene: !!vrScene,
     backButton: !!backButton
   });
-  
+
   // Initially hide the VR scene
   if (vrScene) {
     vrScene.style.display = 'none';
@@ -28,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     console.error('VR Scene not found in the DOM');
   }
-  
+
   videoGrid.style.display = 'grid';
   videoGrid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(200px, 1fr))';
   videoGrid.style.gap = '20px';
@@ -39,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderVideos(videos) {
     console.log("Renderizando videos:", videos.length);
     videoGrid.innerHTML = '';
-    
+
     videos.forEach(v => {
       const card = document.createElement('div');
       card.className = 'video-card';
@@ -59,13 +71,13 @@ document.addEventListener('DOMContentLoaded', () => {
       titleElement.addEventListener('click', async () => {
         console.log(`Clic en video: ${v.label}, ID: ${v.youtubeId}`);
         debugPanel.textContent = `Estado: Iniciando carga de ${v.label}`;
-        
+
         // Hide the main container and show VR scene
         mainContainer.style.display = 'none';
         if (vrScene) {
           vrScene.style.display = 'block';
           console.log("VR Scene mostrada");
-          
+
           // Force A-Frame to redraw and recognize the video
           const videosphere = document.getElementById('videosphere');
           if (videosphere) {
@@ -85,14 +97,14 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
           console.error('VR Scene not found');
         }
-        
+
         if (backButton) {
           backButton.style.display = 'block';
           console.log("Botón atrás mostrado");
         } else {
           console.error('Back button not found');
         }
-        
+
         if (!debugPanel) {
           console.error('El elemento debug-panel no existe en el DOM.');
           return;
@@ -120,30 +132,30 @@ document.addEventListener('DOMContentLoaded', () => {
         video360.removeAttribute('src');
         video360.load();
         video360.src = `${SERVER}/stream/${v.youtubeId}`;
-        
+
         // Remove muted attribute to allow sound
         video360.muted = false;
-        
+
         console.log("Video configurado, esperando a que se pueda reproducir...");
 
         try {
           // We need to wait for the video to be loaded
-          const canPlayHandler = function() {
+          const canPlayHandler = function () {
             console.log("Video listo para reproducir");
             video360.removeEventListener('canplay', canPlayHandler);
-            
+
             video360.play().then(() => {
               console.log("Video reproduciendo correctamente");
               debugPanel.textContent = `Estado: Reproduciendo ${v.label}`;
               loading.style.display = 'none';
-              
+
               // Ensure the video is connected to the videosphere
               const videosphere = document.getElementById('videosphere');
               if (videosphere) {
                 // Update the material to ensure it reflects the new video source
                 videosphere.setAttribute('material', 'src', '#video360');
                 // videosphere.setAttribute('material', 'side', 'back');
-                
+
                 // Trigger A-Frame to update the scene
                 if (typeof AFRAME !== 'undefined') {
                   console.log("Forzando actualización de A-Frame");
@@ -156,16 +168,16 @@ document.addEventListener('DOMContentLoaded', () => {
               loading.style.display = 'none';
             });
           };
-          
+
           video360.addEventListener('canplay', canPlayHandler);
-          
+
           // También manejamos errores de carga
-          video360.addEventListener('error', function(e) {
+          video360.addEventListener('error', function (e) {
             console.error("Error en carga de video:", e);
             debugPanel.textContent = `Estado: Error al cargar video - ${e.type}`;
             loading.style.display = 'none';
           });
-          
+
         } catch (e) {
           console.error('Error al configurar video:', e);
           debugPanel.textContent = `Estado: Error al cargar ${v.label}`;
@@ -180,31 +192,59 @@ document.addEventListener('DOMContentLoaded', () => {
   // Back button functionality
   if (backButton) {
     backButton.addEventListener('click', () => {
-      // Pause and reset video
       if (video360) {
+        // 1) Pausar y resetear
         video360.pause();
         video360.currentTime = 0;
+
+        // 2) Clonar un nuevo <video> limpio
+        const parent = video360.parentNode;
+        const newVideo = video360.cloneNode(false); // clona sin children ni listeners
+
+        // 3) Re-aplicar atributos necesarios
+        newVideo.id = 'video360';
+        newVideo.setAttribute('crossorigin', 'anonymous');
+        newVideo.setAttribute('playsinline', '');
+        newVideo.setAttribute('webkit-playsinline', '');
+        newVideo.setAttribute('preload', 'auto');
+        // (no src, queda vacío)
+
+        // 4) Remplazar en el DOM
+        parent.removeChild(video360);
+        parent.appendChild(newVideo);
+
+        // 5) Actualizar referencia en tu JS
+        video360 = newVideo;
+        // y avisa a la esfera
+        document
+          .getElementById('videosphere')
+          .setAttribute('src', '#video360');
       }
-      
-      // Hide VR scene and show main container
-      if (vrScene) {
-        vrScene.style.display = 'none';
-      }
+
+      // Ocultar escena VR y mostrar galería…
+      if (vrScene) vrScene.style.display = 'none';
       mainContainer.style.display = 'flex';
-      if (backButton) {
-        backButton.style.display = 'none';
-      }
-      
-      if (debugPanel) {
-        debugPanel.textContent = 'Estado: Esperando selección de video';
-      }
+      backButton.style.display = 'none';
+      if (debugPanel) debugPanel.textContent = 'Estado: Esperando selección de video';
+
     });
   } else {
     console.error('Back button not found in the DOM');
   }
 
-  fetch(`${SERVER}/videos`)
+  // Carga la lista de vídeos protegida con JWT
+  fetch(`${SERVER}/videos`, {
+    headers: {
+      'Authorization': `Bearer ${token}`            // ← incluimos el Bearer token
+    }
+  })
     .then(r => {
+      if (r.status === 401) {
+        throw new Error('No autorizado. Por favor, inicia sesión.');
+      }
+      if (!r.ok) {
+        throw new Error(`Error ${r.status} al cargar videos`);
+      }
       console.log("Respuesta recibida del servidor");
       return r.json();
     })
@@ -215,7 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
     })
     .catch(err => {
       console.error('Error al cargar los videos:', err);
-      debugPanel.textContent = 'Estado: Error al cargar la lista de videos';
+      debugPanel.textContent = `Estado: ${err.message}`;
     });
 
   searchInput.addEventListener('input', () => {
