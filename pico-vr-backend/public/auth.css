@@ -1,0 +1,33 @@
+ body {
+      font-family: Arial;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    #container {
+      width: 300px;
+    }
+
+    form {
+      display: none;
+    }
+
+    form.active {
+      display: block;
+    }
+
+    input,
+    button {
+      width: 100%;
+      padding: 8px;
+      margin: 5px 0;
+    }
+
+    #toggle {
+      text-align: center;
+      cursor: pointer;
+      color: #4285f4;
+    }
