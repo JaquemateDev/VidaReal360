@@ -1,12 +1,13 @@
 // main.js
 
-// Componente custom-video-controller (sin cambios)
+// Componente custom-video-controller (con cambios en el icono)
 AFRAME.registerComponent('custom-video-controller', {
   schema: { target: { type: 'selector' } },
   init: function () {
     const video = this.data.target;
     const el = this.el;
     const btnSize = 0.3;
+    const iconSize = 0.5; // ajustado para que quepa dentro del círculo
     const timeOffsetX = btnSize / 2 + 0.1;
 
     // Botón redondo Play/Pause
@@ -17,17 +18,22 @@ AFRAME.registerComponent('custom-video-controller', {
     playBtn.setAttribute('material', 'color: #000; opacity: 0.5');
     el.appendChild(playBtn);
 
-    const icon = document.createElement('a-text');
-    icon.setAttribute('value', '▶');
-    icon.setAttribute('align', 'center');
-    icon.setAttribute('baseline', 'center');
-    icon.setAttribute('width', btnSize);
+    // Icono como imagen (play/pause)
+    const icon = document.createElement('a-image');
+    icon.setAttribute('src', '#playIcon');
+    icon.setAttribute('width', iconSize);
+    icon.setAttribute('height', iconSize);
     icon.setAttribute('position', '0 0 0.01');
     playBtn.appendChild(icon);
 
     playBtn.addEventListener('click', () => {
-      if (video.paused) { video.play(); icon.setAttribute('value', '⏸'); }
-      else { video.pause(); icon.setAttribute('value', '▶'); }
+      if (video.paused) {
+        video.play();
+        icon.setAttribute('src', '#pauseIcon');
+      } else {
+        video.pause();
+        icon.setAttribute('src', '#playIcon');
+      }
     });
 
     // Texto de tiempo
@@ -56,7 +62,7 @@ AFRAME.registerComponent('custom-video-controller', {
   }
 });
 
-// Lógica de la aplicación
+// Resto de tu main.js sigue igual...
 window.addEventListener('DOMContentLoaded', () => {
   const token = localStorage.getItem('token');
   if (!token) { window.location.replace('/auth.html'); return; }
@@ -70,7 +76,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const vrScene       = document.querySelector('a-scene');
   const backButton    = document.getElementById('back-button');
   const customControls= document.getElementById('customControls');
-  let   video360      = document.getElementById('video360');
+  const video360      = document.getElementById('video360');
   let   allVideos     = [];
 
   // Ocultar VR y controles al inicio
@@ -118,7 +124,7 @@ window.addEventListener('DOMContentLoaded', () => {
         video360.removeAttribute('src');
         video360.load();
 
-        // Asignar src con token para streaming nativo
+        // Asignar src con token para streaming nativo MP4
         video360.src = `${SERVER}/stream/${v.youtubeId}?token=${token}`;
         video360.load();
         video360.muted = false;
@@ -131,6 +137,10 @@ window.addEventListener('DOMContentLoaded', () => {
             loading.style.display  = 'none';
             const scene = AFRAME.scenes[0];
             if (scene) scene.renderer.setAnimationLoop(scene.render);
+          }).catch(err => {
+            console.error('Error al reproducir:', err);
+            debugPanel.textContent = `Error al reproducir: ${err.message}`;
+            loading.style.display  = 'none';
           });
         };
         video360.addEventListener('canplay', onCanPlay);

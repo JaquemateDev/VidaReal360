@@ -5,10 +5,7 @@
   <meta charset="UTF-8">
   <title>Pico VR Gallery</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <!-- Tu CSS original intacto -->
   <link rel="stylesheet" href="index.css">
-
   <!-- A-Frame -->
   <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
 </head>
@@ -36,18 +33,12 @@
   <button id="back-button">← Volver a la galería</button>
 
   <!-- ESCENA VR -->
-  <a-scene
-    vr-mode-ui="enabled: true"
-    style="position:absolute; top:0; left:0; width:100%; height:100%; display:none;">
+  <a-scene vr-mode-ui="enabled: true" style="position:absolute; top:0; left:0; width:100%; height:100%; display:none;">
 
     <a-assets>
-      <video
-        id="video360"
-        src=""
-        crossorigin="anonymous"
-        playsinline
-        webkit-playsinline
-        preload="auto">
+      <img id="playIcon" src="play-button.png">
+      <img id="pauseIcon" src="pause-button.png">
+      <video id="video360" src="" crossorigin="anonymous" playsinline webkit-playsinline preload="auto">
       </video>
     </a-assets>
 
@@ -73,4 +64,5 @@
   <!-- Script principal -->
   <script src="main.js"></script>
 </body>
+
 </html>
