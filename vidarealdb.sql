@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 14-05-2025 a las 12:46:56
+-- Tiempo de generación: 21-05-2025 a las 11:11:13
 -- Versión del servidor: 10.4.32-MariaDB
 -- Versión de PHP: 8.2.12
 
@@ -33,16 +33,24 @@ CREATE TABLE `usuario` (
   `apellidos` varchar(75) NOT NULL,
   `email` varchar(255) NOT NULL,
   `contrasena` varchar(255) NOT NULL,
-  `creado` timestamp NOT NULL DEFAULT current_timestamp()
+  `creado` timestamp NOT NULL DEFAULT current_timestamp(),
+  `is_admin` tinyint(1) NOT NULL DEFAULT 0,
+  `stripe_customer_id` varchar(255) DEFAULT NULL,
+  `stripe_subscription_id` varchar(255) DEFAULT NULL,
+  `is_subscribed` tinyint(1) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Volcado de datos para la tabla `usuario`
 --
 
-INSERT INTO `usuario` (`id`, `nombre`, `apellidos`, `email`, `contrasena`, `creado`) VALUES
-(2, 'Gabriel', 'Hernández Collado', 'gabrielhernandezdaw@gmail.com', '$2b$10$o4/GDQu98H2BszesMUnZiOs/9N7N8wZrafKC1kErw5yOawJGvQhAe', '2025-05-14 10:22:23'),
-(4, 'Tiziano2', 'Borra2', 'prueba2@gmail.com', '$2b$10$Y7Sxzdra74tNBjvPnmIi/.eHfOREPtLIU8C4BD8Ee9A5fQ2qFD3le', '2025-05-14 10:34:03');
+INSERT INTO `usuario` (`id`, `nombre`, `apellidos`, `email`, `contrasena`, `creado`, `is_admin`, `stripe_customer_id`, `stripe_subscription_id`, `is_subscribed`) VALUES
+(2, 'Gabriel', 'Hernández Collado', 'gabrielhernandezdaw@gmail.com', '$2b$10$o4/GDQu98H2BszesMUnZiOs/9N7N8wZrafKC1kErw5yOawJGvQhAe', '2025-05-14 10:22:23', 1, 'cus_SLSC8YZNpBAkr0', 'sub_1RQmcc2Kv0DNBVg9eBtF0wve', 1),
+(4, 'Tiziano2', 'Borra2', 'prueba2@gmail.com', '$2b$10$Y7Sxzdra74tNBjvPnmIi/.eHfOREPtLIU8C4BD8Ee9A5fQ2qFD3le', '2025-05-14 10:34:03', 1, NULL, NULL, 0),
+(5, 'hol', 'hol', 'hol@gmail.com', '$2b$10$MvQd9HKG178z8KAgRr6qQejZXZBe9V4g7pcr3LkmWWRAysItushAG', '2025-05-15 09:39:54', 0, 'cus_SLpfLjPVM32FYy', NULL, 1),
+(6, 'sa', 'sa', 'sa@gmail.com', '$2b$10$20GJ/NSPDdoyisymv1QQlumknphKy91o9O2L2XaUHg4CX1K9w7yZu', '2025-05-19 08:36:26', 0, NULL, NULL, 0),
+(7, 'tiziano', 'borra', 'tizianoborra1@gmail.com', '$2b$10$uK5f6Pw2Ok8FgReGrYsJDOQ8fBWm.gaXEHQjn0Dijm5775DJOEBLi', '2025-05-19 08:40:11', 0, 'cus_SL5x73tUEacbNX', NULL, 1),
+(8, '', '', 'prueba@gmail.com', '$2b$10$JEIlc.ftyGM/InYEa1A/bud6WzPOliu1S8CNG6fKyRS7Cu5d.sLVW', '2025-05-21 07:55:43', 0, 'cus_SLp9QpnOlHWEag', NULL, 0);
 
 -- --------------------------------------------------------
 
@@ -121,7 +129,7 @@ ALTER TABLE `video`
 -- AUTO_INCREMENT de la tabla `usuario`
 --
 ALTER TABLE `usuario`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT de la tabla `video`

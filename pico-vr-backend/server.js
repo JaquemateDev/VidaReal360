@@ -4,7 +4,7 @@ const cors = require('cors');
 const mysql = require('mysql2/promise');
 const jwt = require('jsonwebtoken');
 const Stripe = require('stripe');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
@@ -49,7 +49,10 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
       const [[user]] = await pool.query('SELECT id FROM usuario WHERE stripe_customer_id = ?', [session.customer]);
-      if (user) await pool.query('UPDATE usuario SET stripe_subscription_id = ?, is_subscribed = 1 WHERE id = ?', [session.subscription, user.id]);
+      if (user) await pool.query(
+        'UPDATE usuario SET stripe_subscription_id = ?, is_subscribed = 1 WHERE id = ?',
+        [session.subscription, user.id]
+      );
     }
     if (event.type === 'customer.subscription.deleted') {
       const sub = event.data.object;
@@ -101,7 +104,9 @@ app.post('/auth/login',
 // 4) Video list
 app.get('/videos', authMiddleware, async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT id, titulo AS label, url AS youtubeId, miniatura AS thumbnail FROM video');
+    const [rows] = await pool.query(
+      'SELECT id, titulo AS label, url AS youtubeId, miniatura AS thumbnail FROM video'
+    );
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -112,7 +117,10 @@ app.get('/videos', authMiddleware, async (req, res) => {
 // 5) Create Checkout Session
 app.post('/create-checkout-session', authMiddleware, async (req, res) => {
   const userId = req.user.id;
-  const [[user]] = await pool.query('SELECT stripe_customer_id FROM usuario WHERE id = ?', [userId]);
+  const [[user]] = await pool.query(
+    'SELECT stripe_customer_id FROM usuario WHERE id = ?',
+    [userId]
+  );
   let customerId = user.stripe_customer_id;
   if (!customerId) {
     const customer = await stripe.customers.create({ metadata: { userId } });
@@ -120,7 +128,9 @@ app.post('/create-checkout-session', authMiddleware, async (req, res) => {
     await pool.query('UPDATE usuario SET stripe_customer_id = ? WHERE id = ?', [customerId, userId]);
   }
   const session = await stripe.checkout.sessions.create({
-    payment_method_types: ['card'], mode: 'subscription', customer: customerId,
+    payment_method_types: ['card'],
+    mode: 'subscription',
+    customer: customerId,
     line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
     success_url: `${process.env.FRONTEND_URL}/success.html?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${process.env.FRONTEND_URL}/cancel.html`
@@ -130,13 +140,26 @@ app.post('/create-checkout-session', authMiddleware, async (req, res) => {
 
 // 6) Check Subscription
 app.get('/check-subscription', authMiddleware, async (req, res) => {
-  const [[row]] = await pool.query('SELECT is_subscribed FROM usuario WHERE id = ?', [req.user.id]);
+  const [[row]] = await pool.query(
+    'SELECT is_subscribed FROM usuario WHERE id = ?',
+    [req.user.id]
+  );
   if (!row.is_subscribed) {
-    const [[cust]] = await pool.query('SELECT stripe_customer_id FROM usuario WHERE id = ?', [req.user.id]);
+    const [[cust]] = await pool.query(
+      'SELECT stripe_customer_id FROM usuario WHERE id = ?',
+      [req.user.id]
+    );
     if (cust.stripe_customer_id) {
-      const subs = await stripe.subscriptions.list({ customer: cust.stripe_customer_id, status: 'active', limit: 1 });
+      const subs = await stripe.subscriptions.list({
+        customer: cust.stripe_customer_id,
+        status: 'active',
+        limit: 1
+      });
       if (subs.data.length) {
-        await pool.query('UPDATE usuario SET is_subscribed = 1 WHERE id = ?', [req.user.id]);
+        await pool.query(
+          'UPDATE usuario SET is_subscribed = 1 WHERE id = ?',
+          [req.user.id]
+        );
         return res.json({ subscribed: true });
       }
     }
@@ -147,7 +170,10 @@ app.get('/check-subscription', authMiddleware, async (req, res) => {
 // 7) HLS Streaming Endpoint
 app.get('/stream/:youtubeId/playlist.m3u8', authMiddleware, async (req, res) => {
   const youtubeId = req.params.youtubeId;
-  const [[{ is_subscribed }]] = await pool.query('SELECT is_subscribed FROM usuario WHERE id = ?', [req.user.id]);
+  const [[{ is_subscribed }]] = await pool.query(
+    'SELECT is_subscribed FROM usuario WHERE id = ?',
+    [req.user.id]
+  );
   if (!is_subscribed) return res.status(402).json({ error: 'Payment required' });
 
   const outDir = path.join(__dirname, 'hls', youtubeId);
@@ -155,26 +181,50 @@ app.get('/stream/:youtubeId/playlist.m3u8', authMiddleware, async (req, res) => 
   const playlistPath = path.join(outDir, 'playlist.m3u8');
 
   if (!activeHls[youtubeId]) {
-    const ytdlp = spawn('yt-dlp', [
-      '--cookies', 'cookies.txt', '-f', 'bv[ext=mp4]+ba[ext=m4a]/best', '-o', '-',
-      `https://www.youtube.com/watch?v=${youtubeId}`
-    ], { windowsHide: true });
+    // Use npx to ensure yt-dlp is found on Windows
+    const ytdlpCmd = 'npx yt-dlp';
+    // Obtener URLs de vídeo y audio por separado
+    const videoUrl = execSync(
+      `${ytdlpCmd} -f bestvideo[height<=720] -g https://www.youtube.com/watch?v=${youtubeId}`,
+      { encoding: 'utf8', shell: true }
+    ).trim();
+    const audioUrl = execSync(
+      `${ytdlpCmd} -f bestaudio -g https://www.youtube.com/watch?v=${youtubeId}`,
+      { encoding: 'utf8', shell: true }
+    ).trim();
+
+    // Lanzar FFmpeg con ambos streams
     const ffmpeg = spawn('ffmpeg', [
-      '-i', 'pipe:0', '-c:v', 'libx264', '-c:a', 'aac',
-      '-f', 'hls', '-hls_time', '4', '-hls_list_size', '5',
-      '-hls_flags', 'delete_segments+independent_segments',
+      '-hide_banner',
+      '-loglevel', 'info',
+      '-protocol_whitelist', 'file,http,https,tcp,tls,crypto',
+      '-i', videoUrl,
+      '-i', audioUrl,
+      '-map', '0:v',
+      '-map', '1:a',
+      '-c:v', 'libx264',
+      '-preset', 'ultrafast',
+      '-tune', 'zerolatency',
+      '-x264-params', 'keyint=30:min-keyint=30:scenecut=0',
+      '-vf', 'scale=1280:-2',
+      '-c:a', 'aac',
+      '-ac', '2',
+      '-ar', '44100',
+      '-b:a', '128k',
+      '-f', 'hls',
+      '-hls_time', '4',
+      '-hls_list_size', '6',
+      '-hls_flags', 'independent_segments+append_list',
       '-hls_segment_filename', path.join(outDir, 'segment_%03d.ts'),
       playlistPath
     ], { windowsHide: true });
 
-    ytdlp.stdout.pipe(ffmpeg.stdin);
-    activeHls[youtubeId] = { ytdlp, ffmpeg };
-    ytdlp.stderr.on('data', d => console.error(`yt-dlp stderr: ${d}`));
+    activeHls[youtubeId] = { ffmpeg };
     ffmpeg.stderr.on('data', d => console.error(`ffmpeg stderr: ${d}`));
     ffmpeg.on('exit', () => delete activeHls[youtubeId]);
   }
 
-  // Wait until playlist is ready
+  // Esperar hasta que la playlist exista
   const sendWhenReady = () => {
     if (fs.existsSync(playlistPath)) return res.sendFile(playlistPath);
     setTimeout(sendWhenReady, 200);
@@ -191,12 +241,12 @@ app.get('/stream/:youtubeId/:segment', authMiddleware, (req, res) => {
 
 // 9) Stop HLS Stream
 app.post('/stop-stream/:youtubeId', authMiddleware, (req, res) => {
-  const procs = activeHls[req.params.youtubeId];
+  const youtubeId = req.params.youtubeId;
+  const procs = activeHls[youtubeId];
   if (procs) {
-    procs.ytdlp.kill('SIGKILL');
     procs.ffmpeg.kill('SIGKILL');
-    delete activeHls[req.params.youtubeId];
-    fs.rmSync(path.join(__dirname, 'hls', req.params.youtubeId), { recursive: true, force: true });
+    delete activeHls[youtubeId];
+    fs.rmSync(path.join(__dirname, 'hls', youtubeId), { recursive: true, force: true });
     return res.json({ success: true });
   }
   res.json({ success: false });

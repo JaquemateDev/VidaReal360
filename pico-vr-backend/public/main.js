@@ -109,7 +109,7 @@ window.addEventListener('DOMContentLoaded', () => {
       fetch(`${SERVER}/stop-stream/${ytId}`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
-      }).catch(() => {});
+      }).catch(() => { });
       delete video360.dataset.youtubeId;
     }
     video360.pause();
@@ -124,7 +124,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Load and play video with HLS
   const loadAndPlay = async (youtubeId) => {
-    const checkRes = await fetch(`${SERVER}/check-subscription`, { headers: { 'Authorization': `Bearer ${token}` }});
+    const checkRes = await fetch(`${SERVER}/check-subscription`, { headers: { 'Authorization': `Bearer ${token}` } });
     const { subscribed } = await checkRes.json();
     if (!subscribed) {
       const res = await fetch(`${SERVER}/create-checkout-session`, {
@@ -147,6 +147,12 @@ window.addEventListener('DOMContentLoaded', () => {
 
     if (Hls.isSupported()) {
       hls = new Hls({
+        enableWorker: true,
+        maxBufferLength: 45, // Buffer más grande para conexiones inestables
+        maxMaxBufferLength: 90,
+        maxBufferSize: 90 * 1000 * 1000, // 90 MB
+        liveSyncDuration: 20, // Sincronización en tiempo real para streams en vivo
+        liveMaxLatencyDuration: 21, // Reducir latencia máxima
         xhrSetup: (xhr) => { xhr.setRequestHeader('Authorization', `Bearer ${token}`); }
       });
       hls.loadSource(`${SERVER}/stream/${youtubeId}/playlist.m3u8`);
@@ -157,8 +163,13 @@ window.addEventListener('DOMContentLoaded', () => {
         debugPanel.textContent = `Reproduciendo ${youtubeId}`;
       });
       hls.on(Hls.Events.ERROR, (event, data) => {
-        debugPanel.textContent = `Error HLS: ${data.type} ${data.details}`;
-        loading.style.display = 'none';
+        if (data.fatal) {
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            hls.startLoad();
+          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            hls.recoverMediaError();
+          }
+        }
       });
     } else if (video360.canPlayType('application/vnd.apple.mpegurl')) {
       video360.src = `${SERVER}/stream/${youtubeId}/playlist.m3u8`;
@@ -202,16 +213,16 @@ window.addEventListener('DOMContentLoaded', () => {
   fetch(`${SERVER}/videos`, {
     headers: { 'Authorization': `Bearer ${token}` }
   })
-  .then(r => r.ok ? r.json() : Promise.reject(r))
-  .then(videos => {
-    allVideos = videos;
-    renderVideos(videos);
-    debugPanel.textContent = `${videos.length} videos cargados`;
-  })
-  .catch(err => {
-    console.error('Error al cargar videos:', err);
-    debugPanel.textContent = `Error: ${err.message}`;
-  });
+    .then(r => r.ok ? r.json() : Promise.reject(r))
+    .then(videos => {
+      allVideos = videos;
+      renderVideos(videos);
+      debugPanel.textContent = `${videos.length} videos cargados`;
+    })
+    .catch(err => {
+      console.error('Error al cargar videos:', err);
+      debugPanel.textContent = `Error: ${err.message}`;
+    });
 
   // Search filtering
   searchInput.addEventListener('input', () => {
