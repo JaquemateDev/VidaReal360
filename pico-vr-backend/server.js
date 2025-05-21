@@ -4,31 +4,31 @@ const cors = require('cors');
 const mysql = require('mysql2/promise');
 const jwt = require('jsonwebtoken');
 const Stripe = require('stripe');
-const { spawn, execSync } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcrypt');
 const { body, validationResult } = require('express-validator');
 
-// Initialize
-const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+// Initialize Express and Stripe
 const app = express();
 app.use(cors());
 app.use(express.json());
+const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
-// MySQL pool
+// Database pool
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASS,
-  database: process.env.DB_NAME
+  database: process.env.DB_NAME,
 });
 
 // In-memory HLS processes
 const activeHls = {};
 
-// JWT Auth Middleware
+// Auth middleware
 function authMiddleware(req, res, next) {
   const auth = req.headers.authorization;
   const token = auth && auth.startsWith('Bearer ') ? auth.slice(7) : req.query.token;
@@ -41,23 +41,32 @@ function authMiddleware(req, res, next) {
   }
 }
 
-// 1) Stripe Webhook
+// Stripe webhook
 app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'];
   try {
     const event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
-      const [[user]] = await pool.query('SELECT id FROM usuario WHERE stripe_customer_id = ?', [session.customer]);
-      if (user) await pool.query(
-        'UPDATE usuario SET stripe_subscription_id = ?, is_subscribed = 1 WHERE id = ?',
-        [session.subscription, user.id]
+      const [[user]] = await pool.query(
+        'SELECT id FROM usuario WHERE stripe_customer_id = ?', [session.customer]
       );
-    }
-    if (event.type === 'customer.subscription.deleted') {
+      if (user) {
+        await pool.query(
+          'UPDATE usuario SET stripe_subscription_id = ?, is_subscribed = 1 WHERE id = ?',
+          [session.subscription, user.id]
+        );
+      }
+    } else if (event.type === 'customer.subscription.deleted') {
       const sub = event.data.object;
-      const [[user]] = await pool.query('SELECT id FROM usuario WHERE stripe_customer_id = ?', [sub.customer]);
-      if (user) await pool.query('UPDATE usuario SET is_subscribed = 0 WHERE id = ?', [user.id]);
+      const [[user]] = await pool.query(
+        'SELECT id FROM usuario WHERE stripe_customer_id = ?', [sub.customer]
+      );
+      if (user) {
+        await pool.query(
+          'UPDATE usuario SET is_subscribed = 0 WHERE id = ?', [user.id]
+        );
+      }
     }
     res.json({ received: true });
   } catch (err) {
@@ -66,8 +75,9 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
   }
 });
 
-// 2) Register
-app.post('/auth/register',
+// Register
+app.post(
+  '/auth/register',
   body('email').isEmail(),
   body('password').isLength({ min: 6 }),
   async (req, res) => {
@@ -84,8 +94,9 @@ app.post('/auth/register',
   }
 );
 
-// 3) Login
-app.post('/auth/login',
+// Login
+app.post(
+  '/auth/login',
   body('email').isEmail(),
   body('password').exists(),
   async (req, res) => {
@@ -101,7 +112,7 @@ app.post('/auth/login',
   }
 );
 
-// 4) Video list
+// Video list
 app.get('/videos', authMiddleware, async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -114,13 +125,10 @@ app.get('/videos', authMiddleware, async (req, res) => {
   }
 });
 
-// 5) Create Checkout Session
+// Create checkout session
 app.post('/create-checkout-session', authMiddleware, async (req, res) => {
   const userId = req.user.id;
-  const [[user]] = await pool.query(
-    'SELECT stripe_customer_id FROM usuario WHERE id = ?',
-    [userId]
-  );
+  const [[user]] = await pool.query('SELECT stripe_customer_id FROM usuario WHERE id = ?', [userId]);
   let customerId = user.stripe_customer_id;
   if (!customerId) {
     const customer = await stripe.customers.create({ metadata: { userId } });
@@ -133,33 +141,20 @@ app.post('/create-checkout-session', authMiddleware, async (req, res) => {
     customer: customerId,
     line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
     success_url: `${process.env.FRONTEND_URL}/success.html?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${process.env.FRONTEND_URL}/cancel.html`
+    cancel_url: `${process.env.FRONTEND_URL}/cancel.html`,
   });
   res.json({ sessionId: session.id });
 });
 
-// 6) Check Subscription
+// Check subscription
 app.get('/check-subscription', authMiddleware, async (req, res) => {
-  const [[row]] = await pool.query(
-    'SELECT is_subscribed FROM usuario WHERE id = ?',
-    [req.user.id]
-  );
+  const [[row]] = await pool.query('SELECT is_subscribed FROM usuario WHERE id = ?', [req.user.id]);
   if (!row.is_subscribed) {
-    const [[cust]] = await pool.query(
-      'SELECT stripe_customer_id FROM usuario WHERE id = ?',
-      [req.user.id]
-    );
+    const [[cust]] = await pool.query('SELECT stripe_customer_id FROM usuario WHERE id = ?', [req.user.id]);
     if (cust.stripe_customer_id) {
-      const subs = await stripe.subscriptions.list({
-        customer: cust.stripe_customer_id,
-        status: 'active',
-        limit: 1
-      });
+      const subs = await stripe.subscriptions.list({ customer: cust.stripe_customer_id, status: 'active', limit: 1 });
       if (subs.data.length) {
-        await pool.query(
-          'UPDATE usuario SET is_subscribed = 1 WHERE id = ?',
-          [req.user.id]
-        );
+        await pool.query('UPDATE usuario SET is_subscribed = 1 WHERE id = ?', [req.user.id]);
         return res.json({ subscribed: true });
       }
     }
@@ -167,84 +162,102 @@ app.get('/check-subscription', authMiddleware, async (req, res) => {
   res.json({ subscribed: !!row.is_subscribed });
 });
 
-// 7) HLS Streaming Endpoint
-app.get('/stream/:youtubeId/playlist.m3u8', authMiddleware, async (req, res) => {
+// HLS streaming endpoint
+async function handleHls(req, res) {
   const youtubeId = req.params.youtubeId;
-  const [[{ is_subscribed }]] = await pool.query(
-    'SELECT is_subscribed FROM usuario WHERE id = ?',
-    [req.user.id]
-  );
-  if (!is_subscribed) return res.status(402).json({ error: 'Payment required' });
+  try {
+    const [[{ is_subscribed }]] = await pool.query(
+      'SELECT is_subscribed FROM usuario WHERE id = ?', [req.user.id]
+    );
+    if (!is_subscribed) return res.status(402).json({ error: 'Payment required' });
 
-  const outDir = path.join(__dirname, 'hls', youtubeId);
-  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
-  const playlistPath = path.join(outDir, 'playlist.m3u8');
+    const outDir = path.join(__dirname, 'hls', youtubeId);
+    if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+    const playlistPath = path.join(outDir, 'playlist.m3u8');
 
-  if (!activeHls[youtubeId]) {
-    // Use npx to ensure yt-dlp is found on Windows
-    const ytdlpCmd = 'npx yt-dlp';
-    // Obtener URLs de vídeo y audio por separado
-    const videoUrl = execSync(
-      `${ytdlpCmd} -f bestvideo[height<=720] -g https://www.youtube.com/watch?v=${youtubeId}`,
-      { encoding: 'utf8', shell: true }
-    ).trim();
-    const audioUrl = execSync(
-      `${ytdlpCmd} -f bestaudio -g https://www.youtube.com/watch?v=${youtubeId}`,
-      { encoding: 'utf8', shell: true }
-    ).trim();
+    if (!activeHls[youtubeId]) {
+      // Obtain video and audio URLs synchronously
+      const videoRes = spawnSync('yt-dlp', [
+        '--cookies', process.env.YTDLP_COOKIES,
+        '-f', 'bestvideo[height<=720]',
+        '-g', `https://www.youtube.com/watch?v=${youtubeId}`
+      ], { encoding: 'utf8' });
+      const audioRes = spawnSync('yt-dlp', [
+        '--cookies', process.env.YTDLP_COOKIES,
+        '-f', 'bestaudio',
+        '-g', `https://www.youtube.com/watch?v=${youtubeId}`
+      ], { encoding: 'utf8' });
+      if (videoRes.status !== 0 || !videoRes.stdout) {
+        console.error('yt-dlp video error:', videoRes.stderr || videoRes.error);
+        return res.status(500).json({ error: 'Failed to retrieve video URL' });
+      }
+      if (audioRes.status !== 0 || !audioRes.stdout) {
+        console.error('yt-dlp audio error:', audioRes.stderr || audioRes.error);
+        return res.status(500).json({ error: 'Failed to retrieve audio URL' });
+      }
+      const videoUrl = videoRes.stdout.trim();
+      const audioUrl = audioRes.stdout.trim();
+      console.log('Retrieved URLs:', { videoUrl, audioUrl });
 
-    // Lanzar FFmpeg con ambos streams
-    const ffmpeg = spawn('ffmpeg', [
-      '-hide_banner',
-      '-loglevel', 'info',
-      '-protocol_whitelist', 'file,http,https,tcp,tls,crypto',
-      '-i', videoUrl,
-      '-i', audioUrl,
-      '-map', '0:v',
-      '-map', '1:a',
-      '-c:v', 'libx264',
-      '-preset', 'ultrafast',
-      '-tune', 'zerolatency',
-      '-x264-params', 'keyint=30:min-keyint=30:scenecut=0',
-      '-vf', 'scale=1280:-2',
-      '-c:a', 'aac',
-      '-ac', '2',
-      '-ar', '44100',
-      '-b:a', '128k',
-      '-f', 'hls',
-      '-hls_time', '4',
-      '-hls_list_size', '6',
-      '-hls_flags', 'independent_segments+append_list',
-      '-hls_segment_filename', path.join(outDir, 'segment_%03d.ts'),
-      playlistPath
-    ], { windowsHide: true });
+      // Launch FFmpeg
+      const ffmpeg = spawn('ffmpeg', [
+        '-hide_banner',
+        '-loglevel', 'info',
+        '-protocol_whitelist', 'file,http,https,tcp,tls,crypto',
+        '-i', videoUrl,
+        '-i', audioUrl,
+        '-map', '0:v',
+        '-map', '1:a',
+        '-c:v', 'libx264',
+        '-preset', 'fast',
+        '-tune', 'zerolatency',
+        '-x264-params', 'keyint=30:min-keyint=30:scenecut=0',
+        '-vf', 'scale=1280:-2',
+        '-c:a', 'aac',
+        '-ac', '2',
+        '-ar', '44100',
+        '-b:a', '128k',
+        '-f', 'hls',
+        '-hls_time', '4',
+        '-hls_list_size', '6',
+        '-hls_flags', 'independent_segments+append_list',
+        '-hls_segment_filename', path.join(outDir, 'segment_%03d.ts'),
+        playlistPath
+      ], { windowsHide: true });
 
-    activeHls[youtubeId] = { ffmpeg };
-    ffmpeg.stderr.on('data', d => console.error(`ffmpeg stderr: ${d}`));
-    ffmpeg.on('exit', () => delete activeHls[youtubeId]);
+      activeHls[youtubeId] = ffmpeg;
+      ffmpeg.stderr.on('data', d => console.error(`ffmpeg stderr: ${d}`));
+      ffmpeg.on('exit', () => delete activeHls[youtubeId]);
+    }
+
+    // Wait for playlist
+    while (!fs.existsSync(playlistPath)) {
+      await new Promise(r => setTimeout(r, 200));
+    }
+    res.sendFile(playlistPath);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
+}
 
-  // Esperar hasta que la playlist exista
-  const sendWhenReady = () => {
-    if (fs.existsSync(playlistPath)) return res.sendFile(playlistPath);
-    setTimeout(sendWhenReady, 200);
-  };
-  sendWhenReady();
-});
+app.get('/stream/:youtubeId/playlist.m3u8', authMiddleware, handleHls);
 
-// 8) Serve HLS Segments
+// Serve segments('/stream/:youtubeId/playlist.m3u8', authMiddleware, handleHls);
+
+// Serve segments
 app.get('/stream/:youtubeId/:segment', authMiddleware, (req, res) => {
   const file = path.join(__dirname, 'hls', req.params.youtubeId, req.params.segment);
   if (fs.existsSync(file)) return res.sendFile(file);
   res.status(404).end();
 });
 
-// 9) Stop HLS Stream
+// Stop stream
 app.post('/stop-stream/:youtubeId', authMiddleware, (req, res) => {
   const youtubeId = req.params.youtubeId;
-  const procs = activeHls[youtubeId];
-  if (procs) {
-    procs.ffmpeg.kill('SIGKILL');
+  const ffmpeg = activeHls[youtubeId];
+  if (ffmpeg) {
+    ffmpeg.kill('SIGKILL');
     delete activeHls[youtubeId];
     fs.rmSync(path.join(__dirname, 'hls', youtubeId), { recursive: true, force: true });
     return res.json({ success: true });
@@ -252,12 +265,11 @@ app.post('/stop-stream/:youtubeId', authMiddleware, (req, res) => {
   res.json({ success: false });
 });
 
-// 10) Static & Frontend
+// Static & Frontend
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.static(__dirname));
 
-// 11) HTTPS Server
+// HTTPS Server
 const PORT = process.env.PORT || 4000;
 const httpsOptions = {
   key: fs.readFileSync(path.resolve(__dirname, 'certs/key.pem')),
