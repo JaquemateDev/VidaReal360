@@ -1,33 +1,107 @@
- body {
-      font-family: Arial;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-    }
+body {
+  margin: 0;
+  font-family: 'Montserrat', Arial, sans-serif;
+  background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  color: #3d246c;
+}
 
-    #container {
-      width: 300px;
-    }
+#auth-container {
+  background: linear-gradient(135deg, #ede9fe 60%, #c4b5fd 100%);
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow: 0 6px 24px rgba(124, 58, 237, 0.18);
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+}
 
-    form {
-      display: none;
-    }
+.logo-box {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 18px;
+}
 
-    form.active {
-      display: block;
-    }
+.logo-vr {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: #ede9fe;
+  box-shadow: 0 2px 12px rgba(124, 58, 237, 0.10);
+  object-fit: contain;
+  transition: transform 0.2s;
+}
 
-    input,
-    button {
-      width: 100%;
-      padding: 8px;
-      margin: 5px 0;
-    }
+.logo-vr:hover {
+  transform: scale(1.07) rotate(-6deg);
+}
 
-    #toggle {
-      text-align: center;
-      cursor: pointer;
-      color: #4285f4;
-    }
+#auth-title {
+  font-size: 1.8em;
+  margin-bottom: 20px;
+  color: #7c3aed;
+  font-weight: 800;
+}
+
+.auth-form {
+  display: none;
+  flex-direction: column;
+}
+
+.auth-form.active {
+  display: flex;
+}
+
+.auth-form input {
+  margin-bottom: 15px;
+  padding: 12px;
+  border: 2px solid #a78bfa;
+  border-radius: 9px;
+  font-size: 1em;
+  outline: none;
+  transition: border 0.2s;
+  background: #f5f3ff;
+  color: #5b21b6;
+}
+
+.auth-form input:focus {
+  border-color: #7c3aed;
+  background: #fff;
+}
+
+.auth-button {
+  background: #7c3aed;
+  color: white;
+  border: none;
+  border-radius: 9px;
+  padding: 12px;
+  font-size: 1em;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.auth-button:hover {
+  background: #5b21b6;
+}
+
+#auth-toggle {
+  margin-top: 15px;
+  font-size: 0.9em;
+  cursor: pointer;
+  color: #5b21b6;
+}
+
+#auth-toggle:hover {
+  color: #7c3aed;
+}
+
+#auth-msg {
+  margin-top: 10px;
+  font-size: 0.9em;
+  color: #e74c3c;
+}

@@ -80,14 +80,19 @@ app.post(
   '/auth/register',
   body('email').isEmail(),
   body('password').isLength({ min: 6 }),
+  body('nombre').notEmpty(),
+  body('apellidos').notEmpty(),
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-    const { email, password } = req.body;
+    const { email, password, nombre, apellidos } = req.body;
     const [[exists]] = await pool.query('SELECT id FROM usuario WHERE email = ?', [email]);
     if (exists) return res.status(409).json({ error: 'User exists' });
     const hash = await bcrypt.hash(password, 10);
-    await pool.query('INSERT INTO usuario (email, contrasena) VALUES (?, ?)', [email, hash]);
+    await pool.query(
+      'INSERT INTO usuario (email, contrasena, nombre, apellidos) VALUES (?, ?, ?, ?)',
+      [email, hash, nombre, apellidos]
+    );
     const [row] = await pool.query('SELECT LAST_INSERT_ID() AS id');
     const token = jwt.sign({ id: row[0].id, email }, process.env.JWT_SECRET, { expiresIn: '1h' });
     res.json({ token });

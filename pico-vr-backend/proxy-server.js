@@ -33,7 +33,7 @@ app.use((req, res, next) => {
 
 // Configuración del proxy para videos de YouTube
 app.use('/stream', createProxyMiddleware({
-    target: 'https://192.168.0.35:4000',
+    target: 'https://192.168.0.115:4000',
     changeOrigin: true,
     secure: false, // Ignora certificados SSL
     pathRewrite: {
@@ -53,7 +53,7 @@ app.use('/stream', createProxyMiddleware({
 
 // Proxy para la API de videos
 app.use('/videos', createProxyMiddleware({
-    target: 'https://192.168.0.35:4000',
+    target: 'https://192.168.0.115:4000',
     changeOrigin: true,
     secure: false,
     pathRewrite: {

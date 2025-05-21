@@ -9,22 +9,41 @@
   <script src="https://js.stripe.com/v3/"></script>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   <script>
-    // carga tu clave pública en una variable global
     window.STRIPE_PUBLISHABLE_KEY = 'pk_test_51ROwav2Kv0DNBVg9id25UdWHO5HshCQIh6FYIJDTLvheViy8HEYlp4YS2151kbYXvz0tgpnnCPH0jG2p751qH5so00YzyIFHAZ';
   </script>
+<script>
+  window.renderSidebar = function(categories) {
+    const sidebar = document.querySelector('.sidebar');
+    sidebar.innerHTML = `
+      <div class="logo-box">
+        <img src="logo-vr.png" alt="Logo VR" class="logo-vr">
+      </div>
+      <h3><span class="icon">📂</span> Categorías</h3>
+    `;
+    categories.forEach(cat => {
+      const label = document.createElement('label');
+      label.innerHTML = `<input type="checkbox" value="${cat}"> ${cat}`;
+      sidebar.appendChild(label);
+    });
+  };
+</script>
   <!-- A-Frame -->
   <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
 </head>
 
 <body>
+  <div class="logout-container">
+    <button id="logout-btn">Cerrar sesión</button>
+  </div>
   <!-- GALERÍA -->
   <div class="container">
-    <div class="sidebar">
-      <h3>Categorías</h3>
-      <label><input type="checkbox" checked> Reminiscencia</label>
-      <label><input type="checkbox" checked> Relajación</label>
-      <label><input type="checkbox" checked> Cultura</label>
-    </div>
+   <div class="sidebar">
+  <div class="logo-box">
+    <img src="logo-vr.png" alt="Logo VR" class="logo-vr">
+  </div>
+  <h3><span class="icon">📂</span> Categorías</h3>
+  <!-- Las categorías se llenarán dinámicamente -->
+</div>
     <div class="content">
       <div class="search-bar">
         <input id="search-input" type="text" placeholder="Buscar por nombre...">
