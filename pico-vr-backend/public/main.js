@@ -1,16 +1,17 @@
-// main.js
+// Load hls.js via CDN in your HTML:
+// <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
-// Componente custom-video-controller (con cambios en el icono)
+// Custom A-Frame video controls component
 AFRAME.registerComponent('custom-video-controller', {
   schema: { target: { type: 'selector' } },
   init: function () {
     const video = this.data.target;
     const el = this.el;
     const btnSize = 0.3;
-    const iconSize = 0.5; // ajustado para que quepa dentro del círculo
+    const iconSize = 0.5;
     const timeOffsetX = btnSize / 2 + 0.1;
 
-    // Botón redondo Play/Pause
+    // Play/pause button
     const playBtn = document.createElement('a-circle');
     playBtn.setAttribute('class', 'clickable');
     playBtn.setAttribute('radius', btnSize / 2);
@@ -18,7 +19,6 @@ AFRAME.registerComponent('custom-video-controller', {
     playBtn.setAttribute('material', 'color: #000; opacity: 0.5');
     el.appendChild(playBtn);
 
-    // Icono como imagen (play/pause)
     const icon = document.createElement('a-image');
     icon.setAttribute('src', '#playIcon');
     icon.setAttribute('width', iconSize);
@@ -36,7 +36,7 @@ AFRAME.registerComponent('custom-video-controller', {
       }
     });
 
-    // Texto de tiempo
+    // Time display
     const timeText = document.createElement('a-text');
     timeText.setAttribute('value', '00:00 / --:--');
     timeText.setAttribute('align', 'left');
@@ -52,8 +52,8 @@ AFRAME.registerComponent('custom-video-controller', {
   tick: function () {
     const v = this.video;
     const fmt = s => {
-      const m = Math.floor(s/60).toString().padStart(2,'0');
-      const s2 = Math.floor(s%60).toString().padStart(2,'0');
+      const m = Math.floor(s / 60).toString().padStart(2, '0');
+      const s2 = Math.floor(s % 60).toString().padStart(2, '0');
       return `${m}:${s2}`;
     };
     const current = fmt(v.currentTime || 0);
@@ -62,47 +62,120 @@ AFRAME.registerComponent('custom-video-controller', {
   }
 });
 
-// Resto de tu main.js sigue igual...
+// Stripe client initialization
+const stripe = Stripe(window.STRIPE_PUBLISHABLE_KEY);
+
 window.addEventListener('DOMContentLoaded', () => {
   const token = localStorage.getItem('token');
-  if (!token) { window.location.replace('/auth.html'); return; }
+  if (!token) {
+    window.location.replace('/auth.html');
+    return;
+  }
   const SERVER = 'https://192.168.0.35:4000';
 
-  const videoGrid     = document.getElementById('video-grid');
-  const searchInput   = document.getElementById('search-input');
-  const loading       = document.getElementById('loading');
-  const debugPanel    = document.getElementById('debug-panel');
+  const videoGrid = document.getElementById('video-grid');
+  const searchInput = document.getElementById('search-input');
+  const loading = document.getElementById('loading');
+  const debugPanel = document.getElementById('debug-panel');
   const mainContainer = document.querySelector('.container');
-  const vrScene       = document.querySelector('a-scene');
-  const backButton    = document.getElementById('back-button');
-  const customControls= document.getElementById('customControls');
-  const video360      = document.getElementById('video360');
-  let   allVideos     = [];
+  const vrScene = document.querySelector('a-scene');
+  const backButton = document.getElementById('back-button');
+  const customControls = document.getElementById('customControls');
+  const video360 = document.getElementById('video360');
 
-  // Ocultar VR y controles al inicio
+  let allVideos = [];
+  let hls = null;
+
+  // Initial UI state
   if (vrScene) vrScene.style.display = 'none';
   if (customControls) customControls.setAttribute('visible', false);
 
-  // Toggle controles: doble click y doble trigger
+  // Toggle custom controls on double-click
   document.addEventListener('dblclick', () => {
     if (customControls) {
       const vis = customControls.getAttribute('visible');
       customControls.setAttribute('visible', !vis);
     }
   });
-  const laser = document.querySelector('[laser-controls]');
-  let lastTr = 0;
-  if (laser) {
-    laser.addEventListener('triggerdown', () => {
-      const now = Date.now();
-      if (now - lastTr < 400 && customControls) {
-        const vis = customControls.getAttribute('visible');
-        customControls.setAttribute('visible', !vis);
-      }
-      lastTr = now;
-    });
-  }
 
+  // Back button logic
+  backButton.addEventListener('click', () => {
+    if (hls) {
+      hls.destroy();
+      hls = null;
+    }
+    const ytId = video360.dataset.youtubeId;
+    if (ytId) {
+      fetch(`${SERVER}/stop-stream/${ytId}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      }).catch(() => {});
+      delete video360.dataset.youtubeId;
+    }
+    video360.pause();
+    video360.removeAttribute('src');
+    vrScene.style.display = 'none';
+    mainContainer.style.display = 'flex';
+    backButton.style.display = 'none';
+    loading.style.display = 'none';
+    debugPanel.textContent = 'Estado: Esperando selección de video';
+    if (customControls) customControls.setAttribute('visible', false);
+  });
+
+  // Load and play video with HLS
+  const loadAndPlay = async (youtubeId) => {
+    const checkRes = await fetch(`${SERVER}/check-subscription`, { headers: { 'Authorization': `Bearer ${token}` }});
+    const { subscribed } = await checkRes.json();
+    if (!subscribed) {
+      const res = await fetch(`${SERVER}/create-checkout-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const { sessionId } = await res.json();
+      return stripe.redirectToCheckout({ sessionId });
+    }
+
+    cleanUI();
+    mainContainer.style.display = 'none';
+    vrScene.style.display = 'block';
+    backButton.style.display = 'block';
+    loading.style.display = 'block';
+    debugPanel.textContent = `Estado: Iniciando ${youtubeId}`;
+
+    if (Hls.isSupported()) {
+      hls = new Hls({
+        xhrSetup: (xhr) => { xhr.setRequestHeader('Authorization', `Bearer ${token}`); }
+      });
+      hls.loadSource(`${SERVER}/stream/${youtubeId}/playlist.m3u8`);
+      hls.attachMedia(video360);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video360.play();
+        loading.style.display = 'none';
+        debugPanel.textContent = `Reproduciendo ${youtubeId}`;
+      });
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        debugPanel.textContent = `Error HLS: ${data.type} ${data.details}`;
+        loading.style.display = 'none';
+      });
+    } else if (video360.canPlayType('application/vnd.apple.mpegurl')) {
+      video360.src = `${SERVER}/stream/${youtubeId}/playlist.m3u8`;
+      video360.addEventListener('loadedmetadata', () => {
+        video360.play();
+        loading.style.display = 'none';
+        debugPanel.textContent = `Reproduciendo ${youtubeId}`;
+      });
+    } else {
+      debugPanel.textContent = 'Error: HLS no soportado en este navegador';
+      loading.style.display = 'none';
+    }
+
+    video360.dataset.youtubeId = youtubeId;
+  };
+
+  // Render video grid
   function renderVideos(videos) {
     videoGrid.innerHTML = '';
     videos.forEach(v => {
@@ -111,74 +184,41 @@ window.addEventListener('DOMContentLoaded', () => {
       card.innerHTML = `<img src="${v.thumbnail}" alt="${v.label}"><h3>${v.label}</h3>`;
       const title = card.querySelector('h3');
       title.style.cursor = 'pointer';
-      title.addEventListener('click', () => {
-        // Muestra VR y oculta galería
-        mainContainer.style.display = 'none';
-        vrScene.style.display       = 'block';
-        backButton.style.display    = 'block';
-        loading.style.display       = 'block';
-        debugPanel.textContent      = `Estado: Iniciando ${v.label}`;
-
-        // Detener stream anterior y limpiar src
-        video360.pause();
-        video360.removeAttribute('src');
-        video360.load();
-
-        // Asignar src con token para streaming nativo MP4
-        video360.src = `${SERVER}/stream/${v.youtubeId}?token=${token}`;
-        video360.load();
-        video360.muted = false;
-
-        // Esperar canplay
-        const onCanPlay = () => {
-          video360.removeEventListener('canplay', onCanPlay);
-          video360.play().then(() => {
-            debugPanel.textContent = `Estado: Reproduciendo ${v.label}`;
-            loading.style.display  = 'none';
-            const scene = AFRAME.scenes[0];
-            if (scene) scene.renderer.setAnimationLoop(scene.render);
-          }).catch(err => {
-            console.error('Error al reproducir:', err);
-            debugPanel.textContent = `Error al reproducir: ${err.message}`;
-            loading.style.display  = 'none';
-          });
-        };
-        video360.addEventListener('canplay', onCanPlay);
-
-        // Manejo de errores
-        video360.addEventListener('error', e => {
-          console.error('Error al cargar video:', e);
-          debugPanel.textContent = `Error al cargar video`;
-          loading.style.display  = 'none';
-        });
-      });
+      title.addEventListener('click', () => loadAndPlay(v.youtubeId));
       videoGrid.appendChild(card);
     });
   }
 
-  // Botón volver
-  backButton.addEventListener('click', () => {
+  // Clean up UI between videos
+  function cleanUI() {
+    if (hls) { hls.destroy(); hls = null; }
     video360.pause();
     video360.removeAttribute('src');
-    video360.load();
-    video360.currentTime = 0;
+    loading.style.display = 'none';
+    debugPanel.textContent = '';
+  }
 
-    vrScene.style.display       = 'none';
-    mainContainer.style.display = 'flex';
-    backButton.style.display    = 'none';
-    debugPanel.textContent      = 'Estado: Esperando selección de video';
-    if (customControls) customControls.setAttribute('visible', false);
+  // Initial fetch of videos
+  fetch(`${SERVER}/videos`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+  .then(r => r.ok ? r.json() : Promise.reject(r))
+  .then(videos => {
+    allVideos = videos;
+    renderVideos(videos);
+    debugPanel.textContent = `${videos.length} videos cargados`;
+  })
+  .catch(err => {
+    console.error('Error al cargar videos:', err);
+    debugPanel.textContent = `Error: ${err.message}`;
   });
 
-  // Carga lista de vídeos con JWT
-  fetch(`${SERVER}/videos`, { headers: { 'Authorization': `Bearer ${token}` } })
-    .then(r => { if (!r.ok) throw new Error(`Error ${r.status}`); return r.json(); })
-    .then(videos => { allVideos = videos; renderVideos(videos); })
-    .catch(err => { console.error(err); debugPanel.textContent = `Error: ${err.message}`; });
-
-  // Filtrar
+  // Search filtering
   searchInput.addEventListener('input', () => {
     const term = searchInput.value.toLowerCase();
     renderVideos(allVideos.filter(v => v.label.toLowerCase().includes(term)));
   });
+
+  // MSE support check
+  if (!window.MediaSource) debugPanel.textContent = 'Error: Tu navegador no soporta MSE';
 });
