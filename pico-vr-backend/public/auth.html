@@ -5,6 +5,9 @@
   <meta charset="UTF-8">
   <title>Login / Registro</title>
   <link rel="stylesheet" href="auth.css">
+  <link rel="shortcut icon" href="logo-vr.png" type="image/x-icon">
+
+  <script src="env.js"></script>
 </head>
 
 <body>
@@ -30,7 +33,7 @@
   </div>
 
   <script>
-    const SERVER = 'https://192.168.0.115:4000';
+    const SERVER = window.__ENV__.SERVER;
     const loginForm = document.getElementById('loginForm');
     const registerForm = document.getElementById('registerForm');
     const titleEl = document.getElementById('title');

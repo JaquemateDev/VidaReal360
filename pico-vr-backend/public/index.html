@@ -6,12 +6,17 @@
   <title>Pico VR Gallery</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="index.css">
+  <script src="env.js"></script>
   <script src="https://js.stripe.com/v3/"></script>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <link rel="shortcut icon" href="logo-vr.png" type="image/x-icon">
   <script>
     window.STRIPE_PUBLISHABLE_KEY = 'pk_test_51ROwav2Kv0DNBVg9id25UdWHO5HshCQIh6FYIJDTLvheViy8HEYlp4YS2151kbYXvz0tgpnnCPH0jG2p751qH5so00YzyIFHAZ';
   </script>
 <script>
+  window.__ENV__ = {
+      SERVER: 'https://192.168.0.35:4000'
+    };
   window.renderSidebar = function(categories) {
     const sidebar = document.querySelector('.sidebar');
     sidebar.innerHTML = `

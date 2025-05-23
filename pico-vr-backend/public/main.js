@@ -71,7 +71,7 @@ window.addEventListener('DOMContentLoaded', () => {
     window.location.replace('/auth.html');
     return;
   }
-  const SERVER = 'https://192.168.0.115:4000';
+  const SERVER = window.__ENV__.SERVER;
 
   const videoGrid = document.getElementById('video-grid');
   const searchInput = document.getElementById('search-input');
@@ -85,7 +85,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   let allVideos = [];
   let allCategories = new Set();
-  let hls = null; 
+  let hls = null;
 
   // Initial UI state
   if (vrScene) vrScene.style.display = 'none';
@@ -210,132 +210,132 @@ window.addEventListener('DOMContentLoaded', () => {
     debugPanel.textContent = '';
   }
 
-// Palabras clave y categorías asociadas
-const CATEGORY_KEYWORDS = [
-  // Ciudades/Lugares
-  { keyword: 'valencia', category: 'Ciudades/Lugares' },
-  { keyword: 'xativa', category: 'Ciudades/Lugares' },
-  { keyword: 'cullera', category: 'Ciudades/Lugares' },
-  { keyword: 'napoles', category: 'Ciudades/Lugares' },
-  { keyword: 'pompeya', category: 'Ciudades/Lugares' },
-  { keyword: 'casablanca', category: 'Ciudades/Lugares' },
-  { keyword: 'almagro', category: 'Ciudades/Lugares' },
-  { keyword: 'medjugorje', category: 'Ciudades/Lugares' },
-  { keyword: 'bosnia', category: 'Ciudades/Lugares' },
-  { keyword: 'herzegovina', category: 'Ciudades/Lugares' },
-  { keyword: 'piramide', category: 'Ciudades/Lugares' },
-  { keyword: 'teti', category: 'Ciudades/Lugares' },
-  { keyword: 'pilar', category: 'Ciudades/Lugares' },
+  // Palabras clave y categorías asociadas
+  const CATEGORY_KEYWORDS = [
+    // Ciudades/Lugares
+    { keyword: 'valencia', category: 'Ciudades/Lugares' },
+    { keyword: 'xativa', category: 'Ciudades/Lugares' },
+    { keyword: 'cullera', category: 'Ciudades/Lugares' },
+    { keyword: 'napoles', category: 'Ciudades/Lugares' },
+    { keyword: 'pompeya', category: 'Ciudades/Lugares' },
+    { keyword: 'casablanca', category: 'Ciudades/Lugares' },
+    { keyword: 'almagro', category: 'Ciudades/Lugares' },
+    { keyword: 'medjugorje', category: 'Ciudades/Lugares' },
+    { keyword: 'bosnia', category: 'Ciudades/Lugares' },
+    { keyword: 'herzegovina', category: 'Ciudades/Lugares' },
+    { keyword: 'piramide', category: 'Ciudades/Lugares' },
+    { keyword: 'teti', category: 'Ciudades/Lugares' },
+    { keyword: 'pilar', category: 'Ciudades/Lugares' },
 
-  // Playa/Naturaleza
-  { keyword: 'beach', category: 'Playa/Naturaleza' },
-  { keyword: 'wave', category: 'Playa/Naturaleza' },
+    // Playa/Naturaleza
+    { keyword: 'beach', category: 'Playa/Naturaleza' },
+    { keyword: 'wave', category: 'Playa/Naturaleza' },
 
-  // Eventos/Fiestas
-  { keyword: 'fiesta', category: 'Eventos/Fiestas' },
-  { keyword: 'halloween', category: 'Eventos/Fiestas' },
-  { keyword: 'fashion', category: 'Eventos/Fiestas' },
-  { keyword: 'week', category: 'Eventos/Fiestas' },
-  { keyword: 'demo', category: 'Eventos/Fiestas' },
-  { keyword: 'concurso', category: 'Eventos/Fiestas' },
-  { keyword: 'ejemplo', category: 'Eventos/Fiestas' },
+    // Eventos/Fiestas
+    { keyword: 'fiesta', category: 'Eventos/Fiestas' },
+    { keyword: 'halloween', category: 'Eventos/Fiestas' },
+    { keyword: 'fashion', category: 'Eventos/Fiestas' },
+    { keyword: 'week', category: 'Eventos/Fiestas' },
+    { keyword: 'demo', category: 'Eventos/Fiestas' },
+    { keyword: 'concurso', category: 'Eventos/Fiestas' },
+    { keyword: 'ejemplo', category: 'Eventos/Fiestas' },
 
-  // Cultura/Historia
-  { keyword: 'comedias', category: 'Cultura/Historia' },
-  { keyword: 'capilla', category: 'Cultura/Historia' },
-  { keyword: 'sixtina', category: 'Cultura/Historia' },
+    // Cultura/Historia
+    { keyword: 'comedias', category: 'Cultura/Historia' },
+    { keyword: 'capilla', category: 'Cultura/Historia' },
+    { keyword: 'sixtina', category: 'Cultura/Historia' },
 
-  // Religión/Procesiones
-  { keyword: 'procesión', category: 'Religión/Procesiones' },
-  { keyword: 'procesion', category: 'Religión/Procesiones' },
-  { keyword: 'semana santa', category: 'Religión/Procesiones' },
-  { keyword: 'cruz', category: 'Religión/Procesiones' },
-  { keyword: 'belen', category: 'Religión/Procesiones' },
-  { keyword: 'domingo de ramos', category: 'Religión/Procesiones' },
+    // Religión/Procesiones
+    { keyword: 'procesión', category: 'Religión/Procesiones' },
+    { keyword: 'procesion', category: 'Religión/Procesiones' },
+    { keyword: 'semana santa', category: 'Religión/Procesiones' },
+    { keyword: 'cruz', category: 'Religión/Procesiones' },
+    { keyword: 'belen', category: 'Religión/Procesiones' },
+    { keyword: 'domingo de ramos', category: 'Religión/Procesiones' },
 
-  // Música/Conciertos
-  { keyword: 'ac/dc', category: 'Música/Conciertos' },
-  { keyword: 'concert', category: 'Música/Conciertos' },
-  { keyword: 'live', category: 'Música/Conciertos' },
-  { keyword: 'guitar', category: 'Música/Conciertos' },
-  { keyword: 'music', category: 'Música/Conciertos' },
-  { keyword: 'walker', category: 'Música/Conciertos' },
-  { keyword: 'sylvan', category: 'Música/Conciertos' },
-  { keyword: 'whigfield', category: 'Música/Conciertos' },
-  { keyword: 'dire straits', category: 'Música/Conciertos' },
+    // Música/Conciertos
+    { keyword: 'ac/dc', category: 'Música/Conciertos' },
+    { keyword: 'concert', category: 'Música/Conciertos' },
+    { keyword: 'live', category: 'Música/Conciertos' },
+    { keyword: 'guitar', category: 'Música/Conciertos' },
+    { keyword: 'music', category: 'Música/Conciertos' },
+    { keyword: 'walker', category: 'Música/Conciertos' },
+    { keyword: 'sylvan', category: 'Música/Conciertos' },
+    { keyword: 'whigfield', category: 'Música/Conciertos' },
+    { keyword: 'dire straits', category: 'Música/Conciertos' },
 
-  // Transporte
-  { keyword: 'crucero', category: 'Transporte' },
-  { keyword: 'bus', category: 'Transporte' },
-  { keyword: 'vespa', category: 'Transporte' },
+    // Transporte
+    { keyword: 'crucero', category: 'Transporte' },
+    { keyword: 'bus', category: 'Transporte' },
+    { keyword: 'vespa', category: 'Transporte' },
 
-  // Mercados/Compras
-  { keyword: 'mercado', category: 'Mercados/Compras' },
+    // Mercados/Compras
+    { keyword: 'mercado', category: 'Mercados/Compras' },
 
-  // Juegos/Reconocimiento
-  { keyword: 'juegos', category: 'Juegos/Reconocimiento' },
-  { keyword: 'reconocimiento', category: 'Juegos/Reconocimiento' },
-];
+    // Juegos/Reconocimiento
+    { keyword: 'juegos', category: 'Juegos/Reconocimiento' },
+    { keyword: 'reconocimiento', category: 'Juegos/Reconocimiento' },
+  ];
 
-// Función para detectar categorías en un título
-function detectCategories(label) {
-  const found = [];
-  const lower = label.toLowerCase();
-  CATEGORY_KEYWORDS.forEach(({ keyword, category }) => {
-    if (lower.includes(keyword)) found.push(category);
-  });
-  return found.length ? Array.from(new Set(found)) : ['Otros'];
-}
-
-function renderSidebar(categories) {
-  if (window.renderSidebar) {
-    window.renderSidebar(categories, false); // Pasamos false para que no estén seleccionados
+  // Función para detectar categorías en un título
+  function detectCategories(label) {
+    const found = [];
+    const lower = label.toLowerCase();
+    CATEGORY_KEYWORDS.forEach(({ keyword, category }) => {
+      if (lower.includes(keyword)) found.push(category);
+    });
+    return found.length ? Array.from(new Set(found)) : ['Otros'];
   }
-  // Al cambiar un checkbox, filtra por esa categoría (solo una a la vez)
-  document.querySelectorAll('.sidebar input[type=checkbox]').forEach(cb => {
-    cb.checked = false; // Asegura que todos estén desmarcados al renderizar
-    cb.addEventListener('change', function () {
-      // Desmarca todos menos el actual
-      document.querySelectorAll('.sidebar input[type=checkbox]').forEach(other => {
-        if (other !== cb) other.checked = false;
+
+  function renderSidebar(categories) {
+    if (window.renderSidebar) {
+      window.renderSidebar(categories, false); // Pasamos false para que no estén seleccionados
+    }
+    // Al cambiar un checkbox, filtra por esa categoría (solo una a la vez)
+    document.querySelectorAll('.sidebar input[type=checkbox]').forEach(cb => {
+      cb.checked = false; // Asegura que todos estén desmarcados al renderizar
+      cb.addEventListener('change', function () {
+        // Desmarca todos menos el actual
+        document.querySelectorAll('.sidebar input[type=checkbox]').forEach(other => {
+          if (other !== cb) other.checked = false;
+        });
+        filterVideos();
       });
-      filterVideos();
     });
-  });
-}
+  }
 
-function filterVideos() {
-  const term = searchInput.value.toLowerCase();
-  // Solo una categoría seleccionada a la vez
-  const checked = Array.from(document.querySelectorAll('.sidebar input[type=checkbox]:checked')).map(cb => cb.value);
-  renderVideos(
-    allVideos.filter(v =>
-      v.label.toLowerCase().includes(term) &&
-      (checked.length === 0 || v.categories.some(cat => checked.includes(cat)))
-    )
-  );
-}
+  function filterVideos() {
+    const term = searchInput.value.toLowerCase();
+    // Solo una categoría seleccionada a la vez
+    const checked = Array.from(document.querySelectorAll('.sidebar input[type=checkbox]:checked')).map(cb => cb.value);
+    renderVideos(
+      allVideos.filter(v =>
+        v.label.toLowerCase().includes(term) &&
+        (checked.length === 0 || v.categories.some(cat => checked.includes(cat)))
+      )
+    );
+  }
 
-fetch(`${SERVER}/videos`, {
-  headers: { 'Authorization': `Bearer ${token}` }
-})
-  .then(r => r.ok ? r.json() : Promise.reject(r))
-  .then(videos => {
-    videos.forEach(v => {
-      v.categories = detectCategories(v.label);
-      v.categories.forEach(cat => allCategories.add(cat));
-    });
-    allVideos = videos;
-    renderSidebar(Array.from(allCategories));
-    renderVideos(allVideos); // Muestra todos al inicio
-    debugPanel.textContent = `${videos.length} videos cargados`;
+  fetch(`${SERVER}/videos`, {
+    headers: { 'Authorization': `Bearer ${token}` }
   })
-  .catch(err => {
-    console.error('Error al cargar videos:', err);
-    debugPanel.textContent = `Error: ${err.message}`;
-  });
+    .then(r => r.ok ? r.json() : Promise.reject(r))
+    .then(videos => {
+      videos.forEach(v => {
+        v.categories = detectCategories(v.label);
+        v.categories.forEach(cat => allCategories.add(cat));
+      });
+      allVideos = videos;
+      renderSidebar(Array.from(allCategories));
+      renderVideos(allVideos); // Muestra todos al inicio
+      debugPanel.textContent = `${videos.length} videos cargados`;
+    })
+    .catch(err => {
+      console.error('Error al cargar videos:', err);
+      debugPanel.textContent = `Error: ${err.message}`;
+    });
 
-searchInput.addEventListener('input', filterVideos);
+  searchInput.addEventListener('input', filterVideos);
 
   // MSE support check
   if (!window.MediaSource) debugPanel.textContent = 'Error: Tu navegador no soporta MSE';

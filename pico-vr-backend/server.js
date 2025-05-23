@@ -11,6 +11,26 @@ const path = require('path');
 const bcrypt = require('bcrypt');
 const { body, validationResult } = require('express-validator');
 
+async function getStreamUrl(youtubeId, format) {
+  return new Promise((resolve, reject) => {
+    const ytdlp = spawn('yt-dlp', [
+      '--cookies', process.env.YTDLP_COOKIES,
+      '-f', format,
+      '-g', `https://www.youtube.com/watch?v=${youtubeId}`
+    ], { windowsHide: true });
+
+    let output = '';
+    ytdlp.stdout.on('data', data => output += data);
+    ytdlp.stderr.on('data', data => console.error(`yt-dlp error: ${data}`));
+
+    ytdlp.on('close', code => {
+      if (code === 0 && output) resolve(output.trim());
+      else reject(new Error(`yt-dlp failed for format ${format}, code ${code}`));
+    });
+  });
+}
+
+const SERVER = process.env.SERVER;
 // Initialize Express and Stripe
 const app = express();
 app.use(cors());
@@ -181,33 +201,20 @@ async function handleHls(req, res) {
     const playlistPath = path.join(outDir, 'playlist.m3u8');
 
     if (!activeHls[youtubeId]) {
-      // Obtain video and audio URLs synchronously
-      const videoRes = spawnSync('yt-dlp', [
-        '--cookies', process.env.YTDLP_COOKIES,
-        '-f', 'bestvideo[height<=720]',
-        '-g', `https://www.youtube.com/watch?v=${youtubeId}`
-      ], { encoding: 'utf8' });
-      const audioRes = spawnSync('yt-dlp', [
-        '--cookies', process.env.YTDLP_COOKIES,
-        '-f', 'bestaudio',
-        '-g', `https://www.youtube.com/watch?v=${youtubeId}`
-      ], { encoding: 'utf8' });
-      if (videoRes.status !== 0 || !videoRes.stdout) {
-        console.error('yt-dlp video error:', videoRes.stderr || videoRes.error);
-        return res.status(500).json({ error: 'Failed to retrieve video URL' });
-      }
-      if (audioRes.status !== 0 || !audioRes.stdout) {
-        console.error('yt-dlp audio error:', audioRes.stderr || audioRes.error);
-        return res.status(500).json({ error: 'Failed to retrieve audio URL' });
-      }
-      const videoUrl = videoRes.stdout.trim();
-      const audioUrl = audioRes.stdout.trim();
+      // Obtener URLs en paralelo
+      const [videoUrl, audioUrl] = await Promise.all([
+        getStreamUrl(youtubeId, 'bestvideo[height<=1080]'),
+        getStreamUrl(youtubeId, 'bestaudio')
+      ]);
+
       console.log('Retrieved URLs:', { videoUrl, audioUrl });
 
       // Launch FFmpeg
       const ffmpeg = spawn('ffmpeg', [
         '-hide_banner',
-        '-loglevel', 'info',
+        '-loglevel', 'warning',
+        '-analyzeduration', '10M',
+        '-probesize', '32M',
         '-protocol_whitelist', 'file,http,https,tcp,tls,crypto',
         '-i', videoUrl,
         '-i', audioUrl,
@@ -215,22 +222,21 @@ async function handleHls(req, res) {
         '-map', '1:a',
         '-c:v', 'libx264',
         '-preset', 'fast',
-        '-tune', 'zerolatency',
-        '-x264-params', 'keyint=30:min-keyint=30:scenecut=0',
-        '-vf', 'scale=1280:-2',
+        '-crf', '20',
+        '-x264-params', 'keyint=60:min-keyint=60:scenecut=0:threads=auto',
+        '-vf', 'scale=-2:720:flags=fast_bilinear',
         '-c:a', 'aac',
-        '-ac', '2',
-        '-ar', '44100',
         '-b:a', '128k',
+        '-ar', '48000',
         '-f', 'hls',
         '-hls_time', '4',
         '-hls_list_size', '6',
-        '-hls_flags', 'independent_segments+append_list',
+        '-hls_flags', 'append_list+omit_endlist',
         '-hls_segment_filename', path.join(outDir, 'segment_%03d.ts'),
         playlistPath
       ], { windowsHide: true });
 
-      activeHls[youtubeId] = ffmpeg;
+      activeHls[youtubeId] = { ffmpeg, lastAccessed: Date.now() }; // pendiente hacer cambios deepseek
       ffmpeg.stderr.on('data', d => console.error(`ffmpeg stderr: ${d}`));
       ffmpeg.on('exit', () => delete activeHls[youtubeId]);
     }
@@ -241,8 +247,9 @@ async function handleHls(req, res) {
     }
     res.sendFile(playlistPath);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Stream error:', err);
+    delete activeHls[youtubeId];
+    res.status(500).json({ error: 'Internal server error: ' + err.message });
   }
 }
 
@@ -260,11 +267,21 @@ app.get('/stream/:youtubeId/:segment', authMiddleware, (req, res) => {
 // Stop stream
 app.post('/stop-stream/:youtubeId', authMiddleware, (req, res) => {
   const youtubeId = req.params.youtubeId;
-  const ffmpeg = activeHls[youtubeId];
-  if (ffmpeg) {
-    ffmpeg.kill('SIGKILL');
+  const entry = activeHls[youtubeId];
+
+  if (entry && entry.ffmpeg) {
+    entry.ffmpeg.kill('SIGKILL');
     delete activeHls[youtubeId];
-    fs.rmSync(path.join(__dirname, 'hls', youtubeId), { recursive: true, force: true });
+
+    try {
+      const dirPath = path.join(__dirname, 'hls', youtubeId);
+      if (fs.existsSync(dirPath)) {
+        fs.rmSync(dirPath, { recursive: true, force: true });
+      }
+    } catch (err) {
+      console.error('Error cleaning directory:', err);
+    }
+
     return res.json({ success: true });
   }
   res.json({ success: false });
@@ -281,5 +298,5 @@ const httpsOptions = {
   cert: fs.readFileSync(path.resolve(__dirname, 'certs/cert.pem'))
 };
 https.createServer(httpsOptions, app).listen(PORT, () =>
-  console.log(`HTTPS server listening on https://localhost:${PORT}`)
+  console.log(`HTTPS server listening on ${SERVER}`)
 );
